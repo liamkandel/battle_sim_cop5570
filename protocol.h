@@ -11,6 +11,8 @@ enum MessageType {
     MSG_READY,
     MSG_ARMY,
     MSG_SEED,
+    MSG_NAME,
+    MSG_STATE_HASH,
     MSG_REMATCH,
     MSG_DISCONNECT,
     MSG_UNKNOWN
@@ -34,6 +36,12 @@ std::string serialize_seed(unsigned int seed);
 
 // Deserialize a seed from a SEED message
 unsigned int deserialize_seed(const std::string& msg);
+
+// Serialize a player name exchange message
+std::string serialize_name(const std::string& name);
+
+// Deserialize player name
+std::string deserialize_name(const std::string& msg);
 
 // Serialize a REMATCH message
 std::string serialize_rematch(bool yes);

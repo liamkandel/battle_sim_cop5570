@@ -1,11 +1,14 @@
 #include "battle.h"
+#include "ai_strategy.h"
+#include "battle_environment.h"
+#include "spectator.h"
 #include <iostream>
 #include <algorithm>
 #include <cstdlib>
-#include <cmath>
 #include <thread>
 #include <chrono>
 #include <iomanip>
+#include <limits>
 
 // Helper: count alive units in a vector
 static int count_alive(const std::vector<Unit>& army) {
@@ -119,6 +122,7 @@ BattleResult run_battle(std::vector<Unit>& my_army,
                         const std::string& player_name,
                         const std::string& opponent_name) {
     srand(seed);
+    std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
     std::cout << std::endl;
     std::cout << "  ======================================" << std::endl;
@@ -128,14 +132,28 @@ BattleResult run_battle(std::vector<Unit>& my_army,
 
     int round = 0;
     const int MAX_ROUNDS = 50;
+    BattleEnvironment env = create_battle_environment();
+
+    std::cout << "  Environment: Weather = " << weather_name(env.weather)
+              << ", Map = " << map_name(env.map) << std::endl;
+    std::cout << "  Dynamic events: EMP disruption round " << env.emp_round
+              << ", third-party intervention round " << env.third_party_round << std::endl;
 
     while (count_alive(my_army) > 0 && count_alive(enemy_army) > 0 && round < MAX_ROUNDS) {
         round++;
         std::cout << std::endl;
         std::cout << "  ---- Round " << round << " ----" << std::endl;
+        spectator_sender_log("Round " + std::to_string(round) + " started");
 
         // Small delay for dramatic effect
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+        if (round == env.emp_round) {
+            std::cout << "    [World Event] EMP storm disrupts artillery and missile systems this round." << std::endl;
+        }
+        if (round == env.third_party_round) {
+            apply_third_party_event(my_army, enemy_army, round, env, player_name, opponent_name);
+        }
 
         // === PHASE 1: ARTILLERY PRIORITY STRIKE ===
         auto my_artillery = alive_of_type(my_army, ARTILLERY);
@@ -149,8 +167,21 @@ BattleResult run_battle(std::vector<Unit>& my_army,
         for (int idx : my_artillery) {
             auto targets = alive_all(enemy_army);
             if (targets.empty()) break;
-            int target_idx = targets[rand() % targets.size()];
+            int target_idx = choose_target_index(my_army, idx, enemy_army);
+            if (target_idx < 0) break;
+            if (is_emp_blocked(my_army[idx], env, round)) {
+                std::cout << "    " << player_name << "'s " << my_army[idx].name
+                          << " is EMP-jammed and cannot fire." << std::endl;
+                continue;
+            }
             int dmg = calculate_damage(my_army[idx], enemy_army[target_idx]);
+            bool missed = false;
+            dmg = apply_environment_damage(my_army[idx], enemy_army[target_idx], dmg, env, &missed);
+            if (missed) {
+                std::cout << "    " << player_name << "'s " << my_army[idx].name
+                          << " misses due to low visibility." << std::endl;
+                continue;
+            }
             std::cout << "    " << player_name << "'s Artillery fires at "
                       << enemy_army[target_idx].name << " for " << dmg << " dmg" << std::endl;
             apply_damage_with_shields(enemy_army, target_idx, dmg);
@@ -160,8 +191,21 @@ BattleResult run_battle(std::vector<Unit>& my_army,
         for (int idx : enemy_artillery) {
             auto targets = alive_all(my_army);
             if (targets.empty()) break;
-            int target_idx = targets[rand() % targets.size()];
+            int target_idx = choose_target_index(enemy_army, idx, my_army);
+            if (target_idx < 0) break;
+            if (is_emp_blocked(enemy_army[idx], env, round)) {
+                std::cout << "    " << opponent_name << "'s " << enemy_army[idx].name
+                          << " is EMP-jammed and cannot fire." << std::endl;
+                continue;
+            }
             int dmg = calculate_damage(enemy_army[idx], my_army[target_idx]);
+            bool missed = false;
+            dmg = apply_environment_damage(enemy_army[idx], my_army[target_idx], dmg, env, &missed);
+            if (missed) {
+                std::cout << "    " << opponent_name << "'s " << enemy_army[idx].name
+                          << " misses due to low visibility." << std::endl;
+                continue;
+            }
             std::cout << "    " << opponent_name << "'s Artillery fires at "
                       << my_army[target_idx].name << " for " << dmg << " dmg" << std::endl;
             apply_damage_with_shields(my_army, target_idx, dmg);
@@ -190,8 +234,21 @@ BattleResult run_battle(std::vector<Unit>& my_army,
             if (!my_army[idx].alive) continue;
             auto targets = alive_all(enemy_army);
             if (targets.empty()) break;
-            int target_idx = targets[rand() % targets.size()];
+            int target_idx = choose_target_index(my_army, idx, enemy_army);
+            if (target_idx < 0) break;
+            if (is_emp_blocked(my_army[idx], env, round)) {
+                std::cout << "    " << player_name << "'s " << my_army[idx].name
+                          << " is EMP-jammed and cannot attack." << std::endl;
+                continue;
+            }
             int dmg = calculate_damage(my_army[idx], enemy_army[target_idx]);
+            bool missed = false;
+            dmg = apply_environment_damage(my_army[idx], enemy_army[target_idx], dmg, env, &missed);
+            if (missed) {
+                std::cout << "    " << player_name << "'s " << my_army[idx].name
+                          << " misses due to low visibility." << std::endl;
+                continue;
+            }
             if (dmg > 0) {
                 std::cout << "    " << player_name << "'s " << my_army[idx].name
                           << " attacks " << enemy_army[target_idx].name
@@ -205,8 +262,21 @@ BattleResult run_battle(std::vector<Unit>& my_army,
             if (!enemy_army[idx].alive) continue;
             auto targets = alive_all(my_army);
             if (targets.empty()) break;
-            int target_idx = targets[rand() % targets.size()];
+            int target_idx = choose_target_index(enemy_army, idx, my_army);
+            if (target_idx < 0) break;
+            if (is_emp_blocked(enemy_army[idx], env, round)) {
+                std::cout << "    " << opponent_name << "'s " << enemy_army[idx].name
+                          << " is EMP-jammed and cannot attack." << std::endl;
+                continue;
+            }
             int dmg = calculate_damage(enemy_army[idx], my_army[target_idx]);
+            bool missed = false;
+            dmg = apply_environment_damage(enemy_army[idx], my_army[target_idx], dmg, env, &missed);
+            if (missed) {
+                std::cout << "    " << opponent_name << "'s " << enemy_army[idx].name
+                          << " misses due to low visibility." << std::endl;
+                continue;
+            }
             if (dmg > 0) {
                 std::cout << "    " << opponent_name << "'s " << enemy_army[idx].name
                           << " attacks " << my_army[target_idx].name
@@ -217,6 +287,13 @@ BattleResult run_battle(std::vector<Unit>& my_army,
 
         // === STATUS UPDATE ===
         print_status(my_army, enemy_army, player_name, opponent_name);
+
+        // Interactive pacing: both players confirm before next round.
+        if (count_alive(my_army) > 0 && count_alive(enemy_army) > 0 && round < MAX_ROUNDS) {
+            std::cout << "  Press Enter to continue to the next round..." << std::endl;
+            std::string line;
+            std::getline(std::cin, line);
+        }
     }
 
     // === RESULTS ===

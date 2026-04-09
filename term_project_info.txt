@@ -1,0 +1,107 @@
+COP5570 term group project information
+
+----------------------------------------------------------------------
+Important dates:
+
+Project proposal: March 10
+Project finalized proposal: March 13
+Progress report: March 27 , April 10
+Project presentation/demo: April 21-April 23
+Project report/software submission: April 23
+----------------------------------------------------------------------
+Group Size: 1 - 2 (3 with special permission from the instructor)
+
+Project objective: To apply the techniques learned in COP5570 to some
+research and/or practical applications.
+
+A project may be a research project or a development project or a combination
+of both. The relative weight for research and development components will be
+determined based on the nature of the project. Projects with no significant
+research components should have significant development components. Projects
+with research components must also have some development components. 
+
+Grading: Grading will be based on six elements: project proposal
+progress reports, project presentation and demo
+(final week of the class), project report/software.
+
+Participation: 20% (proposal, progress reports, report, demo)
+Research and development: 80% (presentation + demo + software + report)
+
+Research components:
+   1) The significance of the application or problem. (presentation + report)
+   2) The survey of the state of the art. (presentation + report)
+   3) The novelty of the proposed techniques (presentation + report)
+   4) The completeness of the implementation and evaluation
+      (presentation + report)
+
+Development components:
+   1) Software usefulness and correctness (demo + software)
+   2) Software scope (demo + software)
+   3) The challenges/novelty of software implementation techniques
+      (demo + software + presentation + report).
+   4) the completeness of the evaluation (presentation+report)
+
+progress reports: graded by the instructor
+
+Project presentation/demo: graded by classmates based on
+   - clarity
+   - organization/presentation
+   - novelty
+   - evaluation
+   - overall quality of the project
+
+report/software: graded by the instructor/TA
+   - clarity
+   - organization
+   - novelty
+   - evaluation
+   - writing quality
+   - overall quality of the project
+
+----------------------------------------------------------------------------
+
+Examples of potential projects:
+
+1. A full scale threaded/parallel implementation of a
+   UNIX utility (e.g. concurrent make, find, grep, etc).
+   (Development)
+
+2. Design, implement, and evaluate a threaded/MPI/distributed
+   significant algorithm (e.g. ML algorithm, graph algorithm, matrix
+   algorithm).
+   (development/research)
+
+3. Develop, implement, and evaluate a novel communication
+   algorithm (e.g. intro-node broadcast, topology aware collective, etc)
+   (development/research)
+
+4. Performance evaluation of newer technology, such as Software defined networking
+
+5. Peer-to-peer on-line gaming (development)
+
+--------------
+Initial project proposal - about half a page including the following
+information
+
+  - Project title
+  - Project group members
+  - Brief project description
+    * what will you be doing?
+    * why is the project important, interesting, etc?
+    * how is it related to COP5570?
+    * Estimated lines of code in the project.
+
+---
+Final project proposal - same format as the initial proposal
+
+---
+Project progress reports - add about half a page
+to the project proposal
+  - General description of project progress
+  - What were done by each group member during the period
+
+---
+Final submission includes both project software and project report
+The project report is typically 5 to 10 pages in ACM conference
+format and will be graded as a professional publication (reading
+ACM conference or jounral papers to see examples). 

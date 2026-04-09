@@ -1,7 +1,6 @@
 #include "protocol.h"
 #include <sstream>
 #include <cstdlib>
-#include <algorithm>
 
 // Map between unit type names (lowercase) and UnitType enum
 static const char* TYPE_NAMES[] = {
@@ -75,6 +74,18 @@ unsigned int deserialize_seed(const std::string& msg) {
     return (unsigned int)strtoul(msg.substr(pipe + 1).c_str(), nullptr, 10);
 }
 
+std::string serialize_name(const std::string& name) {
+    std::ostringstream oss;
+    oss << "NAME|" << name << "\n";
+    return oss.str();
+}
+
+std::string deserialize_name(const std::string& msg) {
+    size_t pipe = msg.find('|');
+    if (pipe == std::string::npos) return "Opponent";
+    return msg.substr(pipe + 1);
+}
+
 std::string serialize_rematch(bool yes) {
     return yes ? "REMATCH|yes\n" : "REMATCH|no\n";
 }
@@ -91,6 +102,8 @@ MessageType get_message_type(const std::string& msg) {
     if (msg.substr(0, 5) == "READY") return MSG_READY;
     if (msg.substr(0, 4) == "ARMY") return MSG_ARMY;
     if (msg.substr(0, 4) == "SEED") return MSG_SEED;
+    if (msg.substr(0, 4) == "NAME") return MSG_NAME;
+    if (msg.substr(0, 9) == "STATEHASH") return MSG_STATE_HASH;
     if (msg.substr(0, 7) == "REMATCH") return MSG_REMATCH;
     if (msg.substr(0, 10) == "DISCONNECT") return MSG_DISCONNECT;
     return MSG_UNKNOWN;

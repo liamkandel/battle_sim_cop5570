@@ -1,0 +1,14 @@
+# 1) Host a battle (player 1)
+./battle --host --port 5000 --name HostPlayer --spectator <SPECTATOR_HOST> 9000
+
+# 2) Join as second player
+./battle --join <HOSTNAME_OR_IP> 5000 --name JoinPlayer
+# example:
+./battle --join 127.0.0.1 5000 --name JoinPlayer
+
+# 3) Join as spectator (run on spectator machine/terminal)
+./battle --spectator-listen 9000
+
+Example run:
+./battle --host --port 5000 --name HostPlayer --spectator 127.0.0.1 9000
+./battle --join 127.0.0.1 5000 --name JoinPlayer --spectator 127.0.0.1 9000
