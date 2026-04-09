@@ -1,0 +1,114 @@
+Distributed P2P Battle Simulator
+Liam Kandel, Ryan Nageer, Kaitlyn Franklin
+COP5570
+Project Description
+The objective of this project is to develop a Peer-to-Peer (P2P) Distributed War Battle
+Simulator designed to run across multiple nodes on the linprog cluster. Unlike traditional
+client-server games, this system will utilize a decentralized architecture where players on
+different machines (e.g., linprog1, linprog2, linprog3) can instantiate custom armies and engage
+in a synchronized, real-time battle simulation.
+What will you be doing?
+● P2P Network Implementation: Establishing socket-based communication between
+separate linprog nodes to share game state without a central server.
+● Distributed Simulation Engine: Developing a text-based battle engine that processes
+combat logic locally on each node and synchronizes outcomes.
+● Concurrency Management: Using multi-threading to handle simultaneous network I/O,
+user input, and AI combat cycles.
+● AI Combat Logic: Implementing an autonomous system that dictates unit behavior
+and engagement rules during the simulation.
+Why is this project important/interesting?
+Distributed gaming presents unique challenges in state consistency and latency. Building a
+battle simulator on a shared cluster like linprog provides a practical environment to explore
+how independent systems coordinate in real-time without a centralized controller.
+Relationship to COP5570
+This project directly applies several core concepts from Advanced Unix Programming:
+1. Network Programming: TCP/UDP sockets for communication across hosts.
+2. Multi-threading/POSIX Threads: Concurrent game UI and network handling.
+3. Synchronization: Mutex/condition variable coordination between gameplay phases.
+4. Distributed Systems: Node-to-node connection setup, discovery flow, and observer mode.
+Estimated Lines of Code (LOC)
+The current implementation is within the expected 1,200 – 1,800 line target range across
+networking, battle simulation, protocol, and interface modules.
+----------------------------------------------------------------------
+Progress Report #2 (April 10)
+----------------------------------------------------------------------
+General Description of Project Progress
+Since Progress Report #1, we completed end-to-end gameplay and significantly expanded
+scope with distributed features, richer combat mechanics, and usability improvements.
+
+1. End-to-End Distributed Gameplay Completed
+- Full host/join battle flow is implemented and stable.
+- Armies and shared RNG seed are exchanged across nodes.
+- Name exchange between peers is implemented so both terminals display real player names.
+- Graceful disconnect handling is implemented (including SIGINT cleanup).
+- Rematch negotiation is fully integrated after each match.
+
+2. Expanded Distributed Features
+- Node discovery mode is added via a discovery list file:
+  --join-any <nodes_file> <port>
+  This lets a client attempt multiple candidate hosts in sequence.
+- Third-node spectator support is added with UDP:
+  --spectator-listen <port> (observer node)
+  --spectator <host> <port> (battle nodes stream live logs)
+- This enables a 3-node demo setup on linprog (host, joiner, observer).
+
+3. Battle Engine Enhancements
+- AI target selection is now role-aware (not only random targeting).
+  Example behavior includes prioritizing high-impact enemy units and weaker targets.
+- Match environment complexity was introduced:
+  - Random weather per match (Clear, Rain, Fog, Storm, Heatwave)
+  - Random map pool per match (Plains, Urban, Mountains, Coastal, Ruins)
+  - Dynamic world events:
+    - EMP disruption round (missile/artillery jamming)
+    - Third-party drone intervention round (neutral damage to both armies)
+- Between rounds, each player now provides input (press Enter) before continuing.
+  This adds interactive pacing during combat.
+
+4. Software Architecture and Organization
+- New modules were added to keep features organized:
+  - ai_strategy.cpp/.h: AI target selection behavior
+  - discovery.cpp/.h: node discovery join logic
+  - spectator.cpp/.h: observer streaming/listener mode
+  - battle_environment.cpp/.h: weather/map/event mechanics
+- Existing modules were updated:
+  - main.cpp: integrated discovery, spectator, rematch, and name exchange
+  - battle.cpp: environment effects and interactive round pacing
+  - protocol.cpp/.h: additional protocol message support
+  - README.md: updated run instructions and feature documentation
+
+5. Build and Validation
+- Build remains Makefile-driven and compiles cleanly.
+- Current executable supports:
+  - host mode
+  - join mode
+  - auto-discovery join mode
+  - spectator listen mode
+  - spectator streaming from active players
+- Manual testing has been performed for:
+  - host/join connectivity
+  - spectator path
+  - rematch flow
+  - environment/event round behavior
+
+Work Done by Each Group Member (March 27 – April 10)
+Liam:
+- Extended distributed networking features (discovery and spectator architecture)
+- Helped integrate protocol updates and multi-mode CLI behavior
+- Assisted with distributed execution/testing strategy on cluster nodes
+
+Ryan:
+- Implemented and tuned battle engine upgrades (weather, map effects, world events)
+- Integrated round-by-round player interaction and combat flow updates
+- Added/maintained gameplay logic and integration across battle-related modules
+
+Kaitlyn:
+- Updated interface flow and usability prompts (round interaction, run instructions)
+- Organized module structure and documentation updates (README/progress artifacts)
+- Assisted with integration and validation of end-to-end play/testing scenarios
+
+Next Steps (toward final report/demo)
+- Run a larger test matrix across linprog nodes and capture measured results
+  (connection success, battle runtime, event behavior across repeated matches)
+- Finalize presentation slides and demo script (2-player and 3-node spectator demos)
+- Complete final report (ACM style) with architecture diagrams and evaluation section
+- Document limitations/future work (scalability beyond 2 players, richer event balancing)

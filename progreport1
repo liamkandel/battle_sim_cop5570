@@ -1,0 +1,94 @@
+Distributed P2P Battle Simulator
+Liam Kandel, Ryan Nageer, Kaitlyn Franklin
+COP5570
+Project Description
+The objective of this project is to develop a Peer-to-Peer (P2P) Distributed War Battle
+Simulator designed to run across multiple nodes on the linprog cluster. Unlike traditional
+client-server games, this system will utilize a decentralized architecture where players on
+different machines (e.g., linprog1, linprog2, linprog3) can instantiate custom armies and engage
+in a synchronized, real-time battle simulation.
+What will you be doing?
+● P2P Network Implementation: Establishing socket-based communication between
+separate linprog nodes to share game state without a central server.
+● Distributed Simulation Engine: Developing a text-based battle engine that processes
+combat logic locally on each node and synchronizes outcomes (e.g., "Liams ground
+troops have destroyed 3 of Ryans tanks").
+● Concurrency Management: Using multi-threading to handle simultaneous network I/O,
+user input, and the AI combat cycles.
+● AI Combat Logic: Implementing a basic autonomous system that dictates unit behavior
+and engagement rules during the simulation.
+Why is this project important/interesting?
+Distributed gaming presents unique challenges in state consistency and latency. Building a
+battle simulator on a shared cluster like linprog provides a practical environment to explore
+how independent systems can reach a consensus on "who killed whom" in real-time. It moves
+beyond simple data transfer into the realm of distributed logic execution.
+Relationship to COP5570
+This project directly applies several core concepts from Advanced Unix Programming:
+1. Network Programming: Extensive use of TCP/UDP sockets for inter-process
+communication (IPC) across different hosts.
+2. Multi-threading/POSIX Threads: Managing concurrent execution of the game loop and
+network listeners.
+3. Synchronization: Ensuring that all participating nodes see the same battle results at the
+same time (preventing race conditions in game state).
+4. Distributed Systems: Handling node discovery and communication within the
+constraints of the linprog environment.
+Estimated Lines of Code (LOC)
+We estimate the project will consist of approximately 1,200 – 1,800 lines of C/C++ code,
+encompassing the networking layer, the battle engine, and the user interface.
+----------------------------------------------------------------------
+Progress Report #1 (March 27)
+----------------------------------------------------------------------
+General Description of Project Progress
+Since the proposal was finalized, we have completed the architectural design of the system
+and begun implementation of core components. The major design decisions are:
+1. Connection Model: We are using a P2P host/join model over TCP sockets. One player
+starts the game with --host --port <PORT> and listens for a connection. The other
+player connects with --join <hostname> <PORT>. This works across different linprog
+machines (e.g., linprog1 to linprog3) since they share the same internal network.
+No central server is required.
+2. Game Design ("Army Clash"): Each player receives a budget of 200 points to build
+a custom army from six unit types, each with distinct stats and counter relationships:
+- Infantry (10 pts) — basic ground unit
+- Tank (30 pts) — strong vs infantry, high HP and DEF
+- Artillery (35 pts) — fires first each round (priority strike), high ATK
+- Navy/Destroyer (25 pts) — counters missiles with bonus DEF
+- Missile Launcher (40 pts) — ignores enemy DEF entirely, but fragile
+- Shield Wall (20 pts) — absorbs damage for other units, no ATK
+This rock-paper-scissors counter system provides strategic depth while keeping
+the design scope manageable.
+3. Battle Flow: Once both players submit their armies, the compositions and a shared
+RNG seed are exchanged over the TCP connection. The battle then runs deterministically
+on both machines simultaneously — no real-time player input during combat. Each
+round consists of an artillery priority phase, a main combat phase with type bonuses,
+shield absorption, and cleanup of dead units. Results are printed live to both terminals.
+4. Concurrency: The main thread handles the game UI (army design, battle display),
+while a dedicated network thread (POSIX thread) handles send/recv operations.
+A mutex and condition variable synchronize the transition between game phases.
+SIGINT is caught to handle graceful disconnection.
+5. Software Architecture: The codebase is organized into the following modules:
+- main.cpp: Entry point, argument parsing, thread management
+- network.cpp: TCP socket setup, connection handling, send/recv
+- game.cpp: Army design text UI, budget tracking
+- battle.cpp: Round-by-round simulation engine
+- units.cpp: Unit type definitions, stats, type interaction logic
+- protocol.cpp: Serialization/deserialization of game messages
+- Makefile: Build system
+Work Done by Each Group Member (March 13 – March 27)
+Liam:
+- Finalized the overall system architecture (P2P host/join model)
+- Designed the networking protocol (text-based, newline-delimited messages)
+- Began implementing the TCP socket layer (network.cpp) for host/join connections
+Ryan:
+- Designed the unit type system (stats, costs, counter relationships)
+- Defined the battle mechanics (damage formula, priority phases, shield absorption)
+- Began implementing the battle simulation engine (battle.cpp, units.cpp)
+Kaitlyn:
+- Designed the army creation user interface flow
+- Began implementing the text-based army design menu (game.cpp)
+- Set up the project build system (Makefile)
+Next Steps (for Progress Report #2)
+- Complete the networking layer with full send/recv of army data
+- Finish the battle engine and integrate it with the game loop
+- Implement the protocol serialization for army exchange
+- End-to-end testing across two linprog machines
+- Add rematch functionality and graceful disconnection handling
