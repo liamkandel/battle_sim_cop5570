@@ -4,6 +4,7 @@
 #include "protocol.h"
 #include "discovery.h"
 #include "spectator.h"
+#include "team_mode.h"
 
 #include <iostream>
 #include <cstring>
@@ -103,6 +104,8 @@ void print_usage(const char* prog) {
     std::cout << "Usage:" << std::endl;
     std::cout << "  Host a game:  " << prog << " --host --port <PORT> [--name <NAME>]" << std::endl;
     std::cout << "  Join a game:  " << prog << " --join <HOSTNAME> <PORT> [--name <NAME>]" << std::endl;
+    std::cout << "  Team Host:    " << prog << " --host-team --port <PORT> [--name <NAME>]" << std::endl;
+    std::cout << "  Team Join:    " << prog << " --join-team <HOSTNAME> <PORT> [--name <NAME>]" << std::endl;
     std::cout << "  Auto join:    " << prog << " --join-any <NODES_FILE> <PORT> [--name <NAME>]" << std::endl;
     std::cout << "  Spectator:    " << prog << " --spectator-listen <PORT>" << std::endl;
     std::cout << "  Stream logs:  " << prog << " --spectator <HOST> <PORT> (...with host/join)" << std::endl;
@@ -113,6 +116,8 @@ int main(int argc, char* argv[]) {
     bool is_join = false;
     bool auto_join = false;
     bool spectator_listen_mode = false;
+    bool is_host_team = false;
+    bool is_join_team = false;
     int port = 0;
     const char* hostname = nullptr;
     std::string nodes_file;
@@ -126,6 +131,14 @@ int main(int argc, char* argv[]) {
             is_host = true;
         } else if (strcmp(argv[i], "--join") == 0) {
             is_join = true;
+            if (i + 2 < argc) {
+                hostname = argv[++i];
+                port = atoi(argv[++i]);
+            }
+        } else if (strcmp(argv[i], "--host-team") == 0) {
+            is_host_team = true;
+        } else if (strcmp(argv[i], "--join-team") == 0) {
+            is_join_team = true;
             if (i + 2 < argc) {
                 hostname = argv[++i];
                 port = atoi(argv[++i]);
@@ -153,9 +166,13 @@ int main(int argc, char* argv[]) {
         return spectator_run_listener(port);
     }
 
-    if ((!is_host && !is_join && !auto_join) || port <= 0) {
+    if ((!is_host && !is_join && !auto_join && !is_host_team && !is_join_team) || port <= 0) {
         print_usage(argv[0]);
         return 1;
+    }
+
+    if (is_host_team || is_join_team) {
+        return run_team_mode(is_host_team, port, hostname ? hostname : "", player_name);
     }
 
     // Setup signal handler

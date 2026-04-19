@@ -15,6 +15,8 @@ enum MessageType {
     MSG_STATE_HASH,
     MSG_REMATCH,
     MSG_DISCONNECT,
+    MSG_TEAM_LOBBY,
+    MSG_TEAM_START,
     MSG_UNKNOWN
 };
 
@@ -57,5 +59,14 @@ MessageType get_message_type(const std::string& msg);
 
 // Build the actual unit list from an army composition
 std::vector<Unit> build_army(const ArmyComposition& comp);
+
+// Team battle: tell clients how many players are in the lobby
+std::string serialize_team_lobby(int count);
+int deserialize_team_lobby(const std::string& msg);
+
+// Team battle: host broadcasts combined armies for Team A and Team B, plus seed
+// Format: TEAMSTART|seed|teamA_army_str|teamB_army_str
+std::string serialize_team_start(unsigned int seed, const ArmyComposition& teamA, const ArmyComposition& teamB);
+bool deserialize_team_start(const std::string& msg, unsigned int& seed, ArmyComposition& teamA, ArmyComposition& teamB);
 
 #endif // PROTOCOL_H

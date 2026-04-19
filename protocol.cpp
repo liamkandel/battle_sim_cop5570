@@ -106,7 +106,63 @@ MessageType get_message_type(const std::string& msg) {
     if (msg.substr(0, 9) == "STATEHASH") return MSG_STATE_HASH;
     if (msg.substr(0, 7) == "REMATCH") return MSG_REMATCH;
     if (msg.substr(0, 10) == "DISCONNECT") return MSG_DISCONNECT;
+    if (msg.substr(0, 5) == "LOBBY") return MSG_TEAM_LOBBY;
+    if (msg.substr(0, 9) == "TEAMSTART") return MSG_TEAM_START;
     return MSG_UNKNOWN;
+}
+
+std::string serialize_team_lobby(int count) {
+    std::ostringstream oss;
+    oss << "LOBBY|" << count << "\n";
+    return oss.str();
+}
+
+int deserialize_team_lobby(const std::string& msg) {
+    size_t pipe = msg.find('|');
+    if (pipe == std::string::npos) return 0;
+    return atoi(msg.substr(pipe + 1).c_str());
+}
+
+std::string serialize_team_start(unsigned int seed, const ArmyComposition& teamA, const ArmyComposition& teamB) {
+    auto ser_comp = [](const ArmyComposition& a) {
+        std::ostringstream oss;
+        bool first = true;
+        for (auto it = a.begin(); it != a.end(); ++it) {
+            if (it->second <= 0) continue;
+            if (!first) oss << ",";
+            oss << type_to_name(it->first) << ":" << it->second;
+            first = false;
+        }
+        return oss.str();
+    };
+    
+    std::ostringstream oss;
+    oss << "TEAMSTART|" << seed << "|" << ser_comp(teamA) << "|" << ser_comp(teamB) << "\n";
+    return oss.str();
+}
+
+bool deserialize_team_start(const std::string& msg, unsigned int& seed, ArmyComposition& teamA, ArmyComposition& teamB) {
+    size_t pipe1 = msg.find('|');
+    if (pipe1 == std::string::npos) return false;
+    size_t pipe2 = msg.find('|', pipe1 + 1);
+    if (pipe2 == std::string::npos) return false;
+    size_t pipe3 = msg.find('|', pipe2 + 1);
+    if (pipe3 == std::string::npos) return false;
+
+    std::string seed_str = msg.substr(pipe1 + 1, pipe2 - pipe1 - 1);
+    std::string teamA_str = msg.substr(pipe2 + 1, pipe3 - pipe2 - 1);
+    std::string teamB_str = msg.substr(pipe3 + 1);
+    
+    while (!teamB_str.empty() && (teamB_str.back() == '\n' || teamB_str.back() == '\r')) {
+        teamB_str.pop_back();
+    }
+
+    seed = (unsigned int)strtoul(seed_str.c_str(), nullptr, 10);
+    
+    teamA = deserialize_army("ARMY|" + teamA_str);
+    teamB = deserialize_army("ARMY|" + teamB_str);
+    
+    return true;
 }
 
 std::vector<Unit> build_army(const ArmyComposition& comp) {
