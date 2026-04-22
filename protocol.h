@@ -64,9 +64,12 @@ std::vector<Unit> build_army(const ArmyComposition& comp);
 std::string serialize_team_lobby(int count);
 int deserialize_team_lobby(const std::string& msg);
 
-// Team battle: host broadcasts combined armies for Team A and Team B, plus seed
-// Format: TEAMSTART|seed|teamA_army_str|teamB_army_str
-std::string serialize_team_start(unsigned int seed, const ArmyComposition& teamA, const ArmyComposition& teamB);
-bool deserialize_team_start(const std::string& msg, unsigned int& seed, ArmyComposition& teamA, ArmyComposition& teamB);
+// Team battle: host broadcasts combined armies for Team A and Team B, plus seed.
+// 'team' is 'A' or 'B' — each client receives a message tailored to their assignment.
+// Format: TEAMSTART|seed|teamA_army_str|teamB_army_str|A
+std::string serialize_team_start(unsigned int seed, const ArmyComposition& teamA,
+                                 const ArmyComposition& teamB, char team);
+bool deserialize_team_start(const std::string& msg, unsigned int& seed,
+                            ArmyComposition& teamA, ArmyComposition& teamB, char& team);
 
 #endif // PROTOCOL_H

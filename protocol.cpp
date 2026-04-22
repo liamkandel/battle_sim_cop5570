@@ -123,7 +123,8 @@ int deserialize_team_lobby(const std::string& msg) {
     return atoi(msg.substr(pipe + 1).c_str());
 }
 
-std::string serialize_team_start(unsigned int seed, const ArmyComposition& teamA, const ArmyComposition& teamB) {
+std::string serialize_team_start(unsigned int seed, const ArmyComposition& teamA,
+                                 const ArmyComposition& teamB, char team) {
     auto ser_comp = [](const ArmyComposition& a) {
         std::ostringstream oss;
         bool first = true;
@@ -137,31 +138,35 @@ std::string serialize_team_start(unsigned int seed, const ArmyComposition& teamA
     };
     
     std::ostringstream oss;
-    oss << "TEAMSTART|" << seed << "|" << ser_comp(teamA) << "|" << ser_comp(teamB) << "\n";
+    oss << "TEAMSTART|" << seed << "|" << ser_comp(teamA) << "|" << ser_comp(teamB)
+        << "|" << team << "\n";
     return oss.str();
 }
 
-bool deserialize_team_start(const std::string& msg, unsigned int& seed, ArmyComposition& teamA, ArmyComposition& teamB) {
+bool deserialize_team_start(const std::string& msg, unsigned int& seed,
+                            ArmyComposition& teamA, ArmyComposition& teamB, char& team) {
     size_t pipe1 = msg.find('|');
     if (pipe1 == std::string::npos) return false;
     size_t pipe2 = msg.find('|', pipe1 + 1);
     if (pipe2 == std::string::npos) return false;
     size_t pipe3 = msg.find('|', pipe2 + 1);
     if (pipe3 == std::string::npos) return false;
+    size_t pipe4 = msg.find('|', pipe3 + 1);
+    if (pipe4 == std::string::npos) return false;
 
-    std::string seed_str = msg.substr(pipe1 + 1, pipe2 - pipe1 - 1);
+    std::string seed_str  = msg.substr(pipe1 + 1, pipe2 - pipe1 - 1);
     std::string teamA_str = msg.substr(pipe2 + 1, pipe3 - pipe2 - 1);
-    std::string teamB_str = msg.substr(pipe3 + 1);
-    
-    while (!teamB_str.empty() && (teamB_str.back() == '\n' || teamB_str.back() == '\r')) {
-        teamB_str.pop_back();
-    }
+    std::string teamB_str = msg.substr(pipe3 + 1, pipe4 - pipe3 - 1);
+    std::string team_str  = msg.substr(pipe4 + 1);
 
-    seed = (unsigned int)strtoul(seed_str.c_str(), nullptr, 10);
-    
+    while (!team_str.empty() && (team_str.back() == '\n' || team_str.back() == '\r'))
+        team_str.pop_back();
+
+    seed  = (unsigned int)strtoul(seed_str.c_str(), nullptr, 10);
     teamA = deserialize_army("ARMY|" + teamA_str);
     teamB = deserialize_army("ARMY|" + teamB_str);
-    
+    team  = team_str.empty() ? 'A' : team_str[0];
+
     return true;
 }
 
