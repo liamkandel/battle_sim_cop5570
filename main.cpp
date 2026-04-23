@@ -6,6 +6,8 @@
 #include "spectator.h"
 #include "team_mode.h"
 
+#define BATTLE_SIM_VERSION "1.0"
+
 #include <iostream>
 #include <cstring>
 #include <cstdlib>
@@ -184,7 +186,7 @@ int main(int argc, char* argv[]) {
     // ==========================================
     std::cout << std::endl;
     std::cout << "  ======================================" << std::endl;
-    std::cout << "    P2P BATTLE SIMULATOR" << std::endl;
+    std::cout << "    P2P BATTLE SIMULATOR  v" << BATTLE_SIM_VERSION << std::endl;
     std::cout << "  ======================================" << std::endl;
 
     if (is_host) {

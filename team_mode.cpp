@@ -3,11 +3,14 @@
 #include "game.h"
 #include "battle.h"
 #include "protocol.h"
+#include "battle_environment.h"
 
 #include <iostream>
 #include <unistd.h>
 #include <sys/select.h>
 #include <vector>
+#include <ctime>
+#include <cstdlib>
 
 void merge_armies(ArmyComposition& dest, const ArmyComposition& src) {
     for (auto const& kv : src) {
@@ -15,23 +18,42 @@ void merge_armies(ArmyComposition& dest, const ArmyComposition& src) {
     }
 }
 
-int run_team_mode(bool is_host, int port, const std::string& hostname, const std::string& player_name) {
-    std::cout << "\n  ======================================" << std::endl;
-    std::cout << "    TEAM BATTLE MODE (HOST/JOIN)" << std::endl;
-    std::cout << "  ======================================\n" << std::endl;
-    
-    if (is_host) {
-        std::cout << "  " << player_name << " (you) → Team A  (you are the host)" << std::endl;
+static void show_intel_preview(unsigned int seed) {
+    srand(seed);
+    BattleEnvironment env = create_battle_environment();
+    std::cout << std::endl;
+    std::cout << "  +------------------------------------------------------+" << std::endl;
+    std::cout << "  |      BATTLEFIELD INTEL  --  Plan Your Army!          |" << std::endl;
+    std::cout << "  +------------------------------------------------------+" << std::endl;
+    std::cout << "  | Weather : " << weather_name(env.weather)               << std::endl;
+    std::cout << "  | Terrain : " << map_name(env.map)                       << std::endl;
+    std::cout << "  | 3rd-party strike on round : " << env.third_party_round << std::endl;
+    std::cout << "  | EMP event on round        : " << env.emp_round         << std::endl;
+    std::cout << "  +------------------------------------------------------+" << std::endl;
+    std::cout << "  Use this intel to choose the best army for the conditions!" << std::endl;
+    std::cout << std::endl;
+}
 
+int run_team_mode(bool is_host, int port, const std::string& hostname, const std::string& player_name) {
+    std::cout << std::endl;
+    std::cout << "  +============================================+" << std::endl;
+    std::cout << "  |       TEAM BATTLE SIMULATOR  v1.0          |" << std::endl;
+    std::cout << "  |     Multiple Players  --  Two Teams        |" << std::endl;
+    std::cout << "  +============================================+" << std::endl;
+
+    if (is_host) {
+        // ── HOST PATH ────────────────────────────────────────────────────
         TeamLobby lobby = host_team_game(port);
         if (!lobby.is_active) return 1;
-        
-        std::cout << "  Waiting for players to join..." << std::endl;
-        std::cout << "  Press ENTER when everyone has joined to start the game.\n" << std::endl;
 
-        // Handle STDIN and lobby connections simultaneously
+        std::cout << std::endl;
+        std::cout << "  You are the HOST -- " << player_name << std::endl;
+        std::cout << "  Waiting for players to join on port " << port << "..." << std::endl;
+        std::cout << "  Press ENTER when all players have joined to start." << std::endl;
+        std::cout << std::endl;
+
+        // Lobby loop: watch both the listen socket and stdin with select().
         int max_fd = lobby.listen_fd;
-
         while (true) {
             fd_set read_fds;
             FD_ZERO(&read_fds);
@@ -39,70 +61,86 @@ int run_team_mode(bool is_host, int port, const std::string& hostname, const std
             FD_SET(STDIN_FILENO, &read_fds);
 
             struct timeval tv;
-            tv.tv_sec = 0;
-            tv.tv_usec = 500000; // 500ms
+            tv.tv_sec  = 0;
+            tv.tv_usec = 500000; // 500 ms
 
             int ret = select(max_fd + 1, &read_fds, nullptr, nullptr, &tv);
             if (ret > 0) {
                 if (FD_ISSET(STDIN_FILENO, &read_fds)) {
                     std::string line;
                     std::getline(std::cin, line);
-                    break; // host chose to start
+                    if (lobby.clients.empty()) {
+                        std::cout << "  No players have joined yet — keep waiting." << std::endl;
+                    } else {
+                        break;
+                    }
                 }
                 if (FD_ISSET(lobby.listen_fd, &read_fds)) {
                     if (accept_team_client(lobby, 0)) {
-                        int count = (int)lobby.clients.size();
-                        std::cout << "  [" << count << " player"
-                                  << (count == 1 ? "" : "s")
-                                  << " in lobby]  Press ENTER to start, or wait for more." << std::endl;
-                        for (auto& c : lobby.clients) {
-                            send_message(c, serialize_team_lobby(count));
-                        }
+                        size_t n = lobby.clients.size();
+                        // First joiner → Team B, second → Team A, alternating
+                        std::string assigned = (n % 2 == 0) ? "Team B" : "Team A";
+                        std::cout << "  Player #" << n << " connected!"
+                                  << "  Assigned to: " << assigned << std::endl;
+                        for (auto& c : lobby.clients)
+                            send_message(c, serialize_team_lobby((int)n));
                     }
                 }
             }
         }
-        
-        int total = (int)lobby.clients.size();
-        std::cout << "\n  Game starting with " << total << " client"
-                  << (total == 1 ? "" : "s") << " + host." << std::endl;
-        if (lobby.clients.empty()) {
-            std::cout << "  Cannot start team game without at least one other player." << std::endl;
-            close_team_lobby(lobby);
-            return 1;
-        }
-        
-        // Broadcast that we are ready for armies
+
+        std::cout << std::endl;
+        std::cout << "  Lobby closed — " << lobby.clients.size() << " player(s) joined." << std::endl;
+
+        // ── Generate seed early so everyone gets the same intel ─────────
+        unsigned int seed = (unsigned int)time(nullptr);
+
+        // Send seed first so clients can show the intel preview
+        for (auto& c : lobby.clients)
+            send_message(c, serialize_seed(seed));
+
+        // Show intel to host
+        show_intel_preview(seed);
+
+        // Signal clients to start designing their armies
+        for (auto& c : lobby.clients)
+            send_message(c, serialize_ready());
+
+        // ── Collect armies ───────────────────────────────────────────────
         ArmyComposition teamA_comp;
         ArmyComposition teamB_comp;
-        
-        std::cout << "\n  Host designing their own army (Team A)..." << std::endl;
+
+        std::cout << "  +--------------------------------------------+" << std::endl;
+        std::cout << "  | You are: " << player_name << std::endl;
+        std::cout << "  | Your Team: TEAM A  (Host)" << std::endl;
+        std::cout << "  +--------------------------------------------+" << std::endl;
+        std::cout << "  Design your army!" << std::endl;
+
         ArmyComposition host_army = design_army();
         merge_armies(teamA_comp, host_army);
-        
-        std::cout << "\n  Collecting armies from " << lobby.clients.size() << " clients..." << std::endl;
-        for (auto& c : lobby.clients) {
-            send_message(c, serialize_ready());
-        }
-        
-        // Read armies from all clients
+
+        std::cout << std::endl;
+        std::cout << "  Waiting for " << lobby.clients.size()
+                  << " client(s) to submit armies..." << std::endl;
+
         std::vector<ArmyComposition> client_armies;
-        for (auto& c : lobby.clients) {
-            bool got_army = false;
-            while (c.connected && !got_army) {
+        for (size_t i = 0; i < lobby.clients.size(); i++) {
+            auto& c = lobby.clients[i];
+            bool got = false;
+            while (c.connected && !got) {
                 std::string msg = recv_message(c);
-                if (msg.empty()) {
-                    c.connected = false;
-                    break;
-                }
+                if (msg.empty()) { c.connected = false; break; }
                 if (get_message_type(msg) == MSG_ARMY) {
                     client_armies.push_back(deserialize_army(msg));
-                    got_army = true;
+                    got = true;
+                    std::cout << "  Army received from Player #" << (i + 1) << std::endl;
                 }
             }
+            if (!got) client_armies.push_back(ArmyComposition{});
         }
-        
-        // Assign clients to teams (alternating) and record each client's team
+
+        // ── Assign teams (alternating) and build rosters ─────────────────
+        // Host → Team A. Client 0 → Team B, Client 1 → Team A, etc.
         std::vector<char> client_teams(client_armies.size());
         for (size_t i = 0; i < client_armies.size(); i++) {
             if (i % 2 == 0) {
@@ -114,16 +152,15 @@ int run_team_mode(bool is_host, int port, const std::string& hostname, const std
             }
         }
 
-        // Print roster (host side)
-        std::cout << "\n  --- Team Assignments ---" << std::endl;
-        std::cout << "  Team A: " << player_name << " (host)";
-        for (size_t i = 0; i < client_teams.size(); i++) {
-            std::cout << "\n  Team " << client_teams[i] << ": client " << (i + 1);
-        }
-        std::cout << "\n  ------------------------\n" << std::endl;
+        std::cout << std::endl;
+        std::cout << "  --- Team Assignments ---" << std::endl;
+        std::cout << "  Team A: " << player_name << " (host)" << std::endl;
+        for (size_t i = 0; i < client_teams.size(); i++)
+            std::cout << "  Team " << client_teams[i]
+                      << ": Player #" << (i + 1) << std::endl;
+        std::cout << "  ------------------------" << std::endl;
 
-        // Send each client a TEAMSTART message that includes their own team letter
-        unsigned int seed = (unsigned int)time(nullptr);
+        // ── Send each client their personalised TEAMSTART ────────────────
         for (size_t i = 0; i < lobby.clients.size(); i++) {
             if (lobby.clients[i].connected) {
                 char t = (i < client_teams.size()) ? client_teams[i] : 'A';
@@ -131,22 +168,28 @@ int run_team_mode(bool is_host, int port, const std::string& hostname, const std
                              serialize_team_start(seed, teamA_comp, teamB_comp, t));
             }
         }
-        
-        // Run Battle
-        std::vector<Unit> my_units = build_army(teamA_comp);
+
+        // ── Run battle ───────────────────────────────────────────────────
+        std::vector<Unit> my_units    = build_army(teamA_comp);
         std::vector<Unit> enemy_units = build_army(teamB_comp);
-        
-        // Run without waiting for enter (for simplicity) or just interactive
-        run_battle(my_units, enemy_units, seed, "Team A", "Team B");
-        
+        std::string my_label = "TEAM A (" + player_name + ")";
+        run_battle(my_units, enemy_units, seed, my_label, "TEAM B");
+
         close_team_lobby(lobby);
-        
+
     } else {
-        // Client Join
+        // ── CLIENT PATH ──────────────────────────────────────────────────
         Connection conn = join_game(hostname.c_str(), port);
         if (!conn.connected) return 1;
-        
-        std::cout << "  Waiting in lobby..." << std::endl;
+
+        std::cout << std::endl;
+        std::cout << "  Connected to host! Welcome, " << player_name << "!" << std::endl;
+        std::cout << "  Waiting in lobby for host to start..." << std::endl;
+
+        int my_join_number = -1;
+        unsigned int preview_seed = 0;
+        bool has_seed = false;
+
         while (conn.connected) {
             std::string msg = recv_message(conn);
             if (msg.empty()) {
@@ -154,32 +197,50 @@ int run_team_mode(bool is_host, int port, const std::string& hostname, const std
                 close_connection(conn);
                 return 1;
             }
-            if (get_message_type(msg) == MSG_TEAM_LOBBY) {
+            MessageType mtype = get_message_type(msg);
+            if (mtype == MSG_TEAM_LOBBY) {
                 int count = deserialize_team_lobby(msg);
-                std::cout << "  Lobby updated: " << count << " players joined." << std::endl;
-            } else if (get_message_type(msg) == MSG_READY) {
-                std::cout << "  Host started game!" << std::endl;
+                if (my_join_number < 0) my_join_number = count;
+                std::cout << "  [Lobby] " << count << " player(s) now in the lobby." << std::endl;
+            } else if (mtype == MSG_SEED) {
+                preview_seed = deserialize_seed(msg);
+                has_seed = true;
+            } else if (mtype == MSG_READY) {
+                std::cout << "  Host has started the game!" << std::endl;
                 break;
             }
         }
-        
         if (!conn.connected) return 1;
-        
+
+        // Determine team from join order (mirrors host-side assignment)
+        int join_idx = (my_join_number > 0) ? (my_join_number - 1) : 0;
+        std::string my_team_str = (join_idx % 2 == 0) ? "Team B" : "Team A";
+
+        std::cout << std::endl;
+        std::cout << "  +--------------------------------------------+" << std::endl;
+        std::cout << "  | You are: " << player_name << std::endl;
+        std::cout << "  | Your Team: " << my_team_str << std::endl;
+        std::cout << "  +--------------------------------------------+" << std::endl;
+
+        if (has_seed)
+            show_intel_preview(preview_seed);
+
+        std::cout << "  Design your army for " << my_team_str << "!" << std::endl;
+
         ArmyComposition my_army_comp = design_army();
         send_message(conn, serialize_army(my_army_comp));
-        
-        std::cout << "  Waiting for other players to submit armies..." << std::endl;
-        
+
+        std::cout << "  Army submitted! Waiting for all players..." << std::endl;
+
         unsigned int seed = 0;
         ArmyComposition teamA_comp;
         ArmyComposition teamB_comp;
         char my_team = 'A';
         bool started = false;
-        
+
         while (conn.connected) {
             std::string msg = recv_message(conn);
             if (msg.empty()) break;
-            
             if (get_message_type(msg) == MSG_TEAM_START) {
                 if (deserialize_team_start(msg, seed, teamA_comp, teamB_comp, my_team)) {
                     started = true;
@@ -187,26 +248,29 @@ int run_team_mode(bool is_host, int port, const std::string& hostname, const std
                 }
             }
         }
-        
+
         if (!started) {
-            std::cout << "  Failed to start team battle." << std::endl;
+            std::cout << "  Failed to receive battle start." << std::endl;
             close_connection(conn);
             return 1;
         }
-        
-        std::cout << "\n  --- Team Assignments ---" << std::endl;
-        std::cout << "  " << player_name << " (you) → Team " << my_team << std::endl;
-        std::cout << "  ------------------------\n" << std::endl;
+
+        std::cout << std::endl;
+        std::cout << "  ======================================================" << std::endl;
+        std::cout << "                   THE BATTLE IS STARTING!" << std::endl;
+        std::cout << "  ======================================================" << std::endl;
+        std::cout << "  You are: " << player_name
+                  << "  on  Team " << my_team << std::endl;
 
         std::vector<Unit> my_units    = build_army(my_team == 'A' ? teamA_comp : teamB_comp);
         std::vector<Unit> enemy_units = build_army(my_team == 'A' ? teamB_comp : teamA_comp);
-        std::string my_label    = (my_team == 'A') ? "Team A" : "Team B";
-        std::string enemy_label = (my_team == 'A') ? "Team B" : "Team A";
+        std::string my_label    = std::string("TEAM ") + my_team + " (" + player_name + ")";
+        std::string enemy_label = (my_team == 'A') ? "TEAM B" : "TEAM A";
 
         run_battle(my_units, enemy_units, seed, my_label, enemy_label);
-        
+
         close_connection(conn);
     }
-    
+
     return 0;
 }
